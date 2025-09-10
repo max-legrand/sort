@@ -67,7 +67,7 @@ fn extendRun(comptime T: type, list: []T, start: usize, minSize: usize, compare:
 }
 
 const MergeType = enum { XY, YZ, Neither };
-fn checkRules(comptime T: type, stack: *std.ArrayList([]T)) !MergeType {
+fn checkRules(comptime T: type, allocator: std.mem.Allocator, stack: *std.ArrayList([]T)) !MergeType {
     if (stack.items.len < 4) {
         return .Neither;
     }
@@ -90,10 +90,10 @@ fn checkRules(comptime T: type, stack: *std.ArrayList([]T)) !MergeType {
     if (x.len + y.len >= w.len) {
         return_value = .YZ;
     }
-    try stack.append(w);
-    try stack.append(x);
-    try stack.append(y);
-    try stack.append(z);
+    try stack.append(allocator, w);
+    try stack.append(allocator, x);
+    try stack.append(allocator, y);
+    try stack.append(allocator, z);
     return return_value;
 }
 
@@ -230,8 +230,8 @@ fn mergeRuns(
                 allocator,
                 compare,
             );
-            try stack.append(merged);
-            try stack.append(z);
+            try stack.append(allocator, merged);
+            try stack.append(allocator, z);
         },
         .YZ => {
             const z: []T = stack.pop().?;
@@ -243,7 +243,7 @@ fn mergeRuns(
                 allocator,
                 compare,
             );
-            try stack.append(merged);
+            try stack.append(allocator, merged);
         },
         .Neither => unreachable,
     }
@@ -263,16 +263,16 @@ pub fn timsort(
         return;
     }
 
-    var stack = std.ArrayList([]T).init(allocator);
-    defer stack.deinit();
+    var stack = std.ArrayList([]T).empty;
+    defer stack.deinit(allocator);
 
     const run_size: usize = minRunSize(T, list);
 
     var i: usize = 0;
     while (i < list.len) {
         const j = extendRun(T, list, i, run_size, compare);
-        try stack.append(list[i..j]);
-        var rulesCheck = try checkRules(T, &stack);
+        try stack.append(allocator, list[i..j]);
+        var rulesCheck = try checkRules(T, allocator, &stack);
         while (rulesCheck != .Neither) {
             try mergeRuns(
                 T,
@@ -281,7 +281,7 @@ pub fn timsort(
                 allocator,
                 compare,
             );
-            rulesCheck = try checkRules(T, &stack);
+            rulesCheck = try checkRules(T, allocator, &stack);
         }
         i = j;
     }
@@ -316,15 +316,15 @@ pub fn powersort(comptime T: type, list: []T, compare: fn (a: T, b: T) i8) !void
         return;
     }
 
-    var stack = std.ArrayList([]T).init(allocator);
-    defer stack.deinit();
+    var stack = std.ArrayList([]T).empty;
+    defer stack.deinit(allocator);
 
     const run_size: usize = minRunSize(T, list);
 
     var i: usize = 0;
     while (i < list.len) {
         const j = extendRun(T, list, i, run_size, compare);
-        try stack.append(list[i..j]);
+        try stack.append(allocator, list[i..j]);
         i = j;
     }
 
@@ -334,12 +334,12 @@ pub fn powersort(comptime T: type, list: []T, compare: fn (a: T, b: T) i8) !void
     };
 
     const total_runs = stack.items.len;
-    var powers = std.ArrayList(Run).init(allocator);
-    defer powers.deinit();
+    var powers = std.ArrayList(Run).empty;
+    defer powers.deinit(allocator);
 
     for (stack.items, 0..) |r, idx| {
         const power = @clz(idx ^ (total_runs - idx));
-        try powers.append(.{
+        try powers.append(allocator, .{
             .run = r,
             .power = power,
         });

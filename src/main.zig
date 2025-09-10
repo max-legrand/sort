@@ -46,10 +46,10 @@ pub fn main() !void {
     const allocator = arena.allocator();
 
     var args_iter = std.process.args();
-    var args = std.ArrayList(string).init(allocator);
-    defer args.deinit();
+    var args = std.ArrayList(string).empty;
+    defer args.deinit(allocator);
     while (args_iter.next()) |arg| {
-        try args.append(arg);
+        try args.append(allocator, arg);
     }
 
     const cwd = std.fs.cwd();
@@ -98,13 +98,15 @@ fn runFile(file: std.fs.File, allocator: std.mem.Allocator, fileName: ?string) !
     const file_contents = try file.readToEndAlloc(allocator, std.math.maxInt(usize));
 
     var iter = std.mem.splitScalar(u8, file_contents, '\n');
-    var timsort_data = std.ArrayList(string).init(allocator);
-    var powersort_data = std.ArrayList(string).init(allocator);
+    var timsort_data = std.ArrayList(string).empty;
+    defer timsort_data.deinit(allocator);
+    var powersort_data = std.ArrayList(string).empty;
+    defer powersort_data.deinit(allocator);
     while (iter.next()) |line| {
         if (line.len == 0) continue;
         const trimmed = std.mem.trimEnd(u8, line, "\r");
-        try timsort_data.append(try allocator.dupe(u8, trimmed));
-        try powersort_data.append(try allocator.dupe(u8, trimmed));
+        try timsort_data.append(allocator, try allocator.dupe(u8, trimmed));
+        try powersort_data.append(allocator, try allocator.dupe(u8, trimmed));
     }
 
     var start = std.time.nanoTimestamp();
